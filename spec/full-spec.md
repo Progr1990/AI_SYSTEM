@@ -58,6 +58,38 @@ Operational Modes: - Advisory - Controlled AUTO - Aggressive FULL AUTO
 6. Conformance Test:
    Any tampering of stored event bytes SHALL invalidate signature verification during replay.
 
+### Formal Contract: Genesis Anchor
+
+1. The first committed event SHALL define genesis_hash.
+2. genesis_hash SHALL equal SHA256("GENESIS_EVENT").
+3. previous_event_hash for commit_seq = 1 SHALL equal genesis_hash.
+4. Replay SHALL fail deterministically if genesis anchor differs.
+5. Conformance Test:
+   Identical deployments SHALL produce identical genesis_hash.
+
+### Formal Contract: Cryptographic Profile
+
+1. Allowed signature algorithms SHALL be explicitly defined per release.
+2. Minimum key strength SHALL be defined (e.g., >= 256-bit ECC or equivalent).
+3. Deprecated algorithms SHALL be rejected deterministically.
+4. Cryptographic profile SHALL be versioned.
+5. All nodes SHALL reject events signed with algorithms outside the active profile.
+6. Conformance Test:
+   Events signed with non-approved algorithms SHALL be rejected identically across nodes.
+
+### Enterprise Cryptographic Profile v1
+
+1. Approved Signature Algorithm:
+   - Ed25519 (mandatory default)
+2. Approved Hash Algorithm:
+   - SHA-256
+3. Disallowed:
+   - SHA-1
+   - MD5
+   - RSA < 2048
+4. All nodes SHALL reject events signed with non-approved algorithms.
+5. Cryptographic profile SHALL be versioned and immutable per release.
+
 ### Formal Contract: Ordering Authority in Cluster Mode
 
 In clustered deployments:
@@ -284,6 +316,50 @@ No implicit precedence is allowed.
     unauthorized, tampered, and replayed requests with a stable error
     taxonomy.
 
+### Formal Contract: Secure Transport & Channel Binding
+
+1. All cross-boundary communication SHALL use TLS 1.3 or newer.
+2. Mutual TLS (mTLS) SHALL be required for any component authorized to append events.
+3. Forward secrecy SHALL be enforced.
+4. TLS certificate identity SHALL be cryptographically bound to actor_id.
+5. Replay SHALL validate channel identity against authenticated actor_id.
+6. Conformance Test:
+   Connections without valid mTLS SHALL be deterministically rejected.
+
+### Formal Contract: Root of Trust & Key Issuance
+
+1. A system-wide Root Public Key SHALL be defined per deployment.
+2. All ACTIVE keys SHALL be traceable to the Root via signed key certificates.
+3. Key issuance SHALL require deterministic registration in Key Registry.
+4. Key revocation SHALL require signed revocation event.
+5. Trust bootstrap SHALL define explicit initial root registration event.
+6. Conformance Test:
+   Replay SHALL reconstruct identical trust graph and key validity state.
+
+### Formal Contract: Root Key Rotation & Compromise
+
+1. Root key rotation SHALL occur via signed RootRotationEvent.
+2. During transition:
+   - Both old and new root keys SHALL be accepted for a bounded overlap window.
+3. After overlap window:
+   - Old root SHALL be marked REVOKED.
+4. Compromise handling SHALL require:
+   - Immediate revocation event
+   - Deterministic rejection of newly signed artifacts by compromised root
+5. Replay SHALL reconstruct identical root trust graph across rotations.
+6. Conformance Test:
+   Replay across root rotation SHALL produce identical trust states.
+
+### Formal Contract: Actor <-> Signing Key Binding
+
+1. Each actor_id SHALL map deterministically to one or more signature_key_id values.
+2. Mapping SHALL be stored in Key Registry.
+3. Event SHALL be rejected if:
+   - signature_key_id does not belong to actor_id
+4. Mapping changes SHALL require signed KeyBindingUpdateEvent.
+5. Conformance Test:
+   Events with mismatched actor_id and signature_key_id SHALL be rejected identically across nodes.
+
 ### Formal Contract: Deterministic Authorization Evaluation
 
 1. Authorization SHALL be evaluated using:
@@ -306,6 +382,19 @@ No implicit precedence is allowed.
 5. Freshness SHALL NOT depend on wall-clock time.
 6. Conformance Test:
    Replay of identical inbound requests SHALL produce identical rejection outcomes.
+
+### Formal Contract: Nonce Reset & Actor Recovery
+
+1. Nonce reset SHALL only occur via explicit ActorRecoveryEvent.
+2. ActorRecoveryEvent SHALL include:
+   - previous_nonce
+   - new_nonce
+   - recovery_signature
+3. Recovery SHALL require higher-privilege authorization.
+4. Replay SHALL reconstruct identical nonce state transitions.
+5. No implicit nonce reset is allowed.
+6. Conformance Test:
+   Identical recovery event logs SHALL produce identical nonce states.
 
 ### Formal Contract: Key Lifecycle & Revocation
 
@@ -346,6 +435,37 @@ For each compliance domain (GDPR, AI Act, Security, Supply Chain):
    - Access control policy
 
 Compliance coverage SHALL be considered incomplete until all domains include defined controls and evidence mapping.
+
+### Compliance Control Matrix - Defined Controls
+
+GDPR Controls:
+- Data traceability via immutable event log.
+- Right-to-access via deterministic projection rebuild.
+- Retention policy SHALL define explicit duration (e.g., X years configurable per deployment).
+- Access control enforcement via Authorization Contract.
+
+AI Act Controls:
+- Full decision traceability via event sourcing.
+- Deterministic replay for audit.
+- Human override precedence matrix.
+- Risk logging via governance layer.
+
+Security Controls:
+- Cryptographic signature chain.
+- Deterministic replay rejection.
+- Key lifecycle governance.
+- Fail-closed authorization.
+
+Supply Chain Controls:
+- SBOM required per release.
+- Reproducible builds.
+- Artifact signing.
+- SHA256 publication.
+
+Each control SHALL map to:
+- Spec section reference
+- Conformance test
+- Audit artifact type
 
 ------------------------------------------------------------------------
 
