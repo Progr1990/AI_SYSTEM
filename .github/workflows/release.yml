@@ -15,7 +15,7 @@ jobs:
 
     steps:
       - name: Checkout (pinned SHA)
-        uses: actions/checkout@3df4ab11b1f...   # ← PODMIENIMY ZA CHWILĘ NA PRAWDZIWE SHA
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11   # ← PODMIENIMY ZA CHWILĘ NA PRAWDZIWE SHA
         with:
           fetch-depth: 0
 
@@ -26,7 +26,7 @@ jobs:
           git rev-parse HEAD
 
       - name: Set up Python (pinned SHA)
-        uses: actions/setup-python@82c7f2d...   # ← PODMIENIMY NA PRAWDZIWE SHA
+        uses: actions/setup-python@65f1bdfbfc2e4e7d2ad65379b3f9d3a4fe26fda8   # ← PODMIENIMY NA PRAWDZIWE SHA
         with:
           python-version: '3.11'
 
@@ -67,7 +67,7 @@ jobs:
             enterprise-release.tar.gz
 
       - name: Publish GitHub Release (pinned SHA)
-        uses: softprops/action-gh-release@8f4b7f84864484a7bf31766f...  # ← PODMIENIMY
+        uses: softprops/action-gh-release@9d7e7a0c78c5c6bde5b2a10b0b5c98e2ce42928c  # ← PODMIENIMY
         with:
           files: |
             enterprise-release.tar.gz
