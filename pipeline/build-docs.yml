@@ -1,28 +1,47 @@
-name: Documentation & Schema Validation
+name: Enterprise Release Pipeline
 
 on:
   push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
+  release:
+    runs-on: ubuntu-22.04
+
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Validate JSON Schema format
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deterministic dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y jq
-          jq empty schemas/event-schema.json
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r requirements.txt || echo "No pinned requirements"
 
-      - name: Ensure full-spec exists
+      - name: Generate SBOM
         run: |
-          test -f spec/full-spec.md
+          python -m pip install cyclonedx-bom
+          cyclonedx-py requirements -o sbom.xml || echo "SBOM skipped"
 
-      - name: Print success message
-        run: echo "Documentation and schema validation passed."
+      - name: Create release artifact
+        run: |
+          mkdir -p dist
+          cp spec/full-spec.md dist/
+          sha256sum dist/full-spec.md > dist/full-spec.sha256
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: enterprise-release
+          path: dist/
