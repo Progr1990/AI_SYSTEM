@@ -44,6 +44,35 @@ Operational Modes: - Advisory - Controlled AUTO - Aggressive FULL AUTO
     hosts/runtimes SHALL produce identical canonical bytes and identical
     SHA256 values.
 
+### Formal Contract: Event Authenticity & Signature Chain
+
+1. Every committed event SHALL include:
+   - event_signature
+   - signature_algorithm
+   - signature_key_id
+2. event_signature SHALL cover:
+   canonical_event_bytes + commit_seq + previous_event_hash
+3. previous_event_hash SHALL equal SHA256(canonical_event_bytes of previous commit_seq).
+4. The Event Store SHALL verify signature validity before commit.
+5. Signature verification failure SHALL deterministically reject the event.
+6. Conformance Test:
+   Any tampering of stored event bytes SHALL invalidate signature verification during replay.
+
+### Formal Contract: Ordering Authority in Cluster Mode
+
+In clustered deployments:
+
+1. Exactly one Ordering Authority SHALL assign commit_seq.
+2. Leader change SHALL NOT reorder committed events.
+3. No committed event SHALL receive a new commit_seq.
+4. Replay SHALL rely solely on commit_seq, not leader identity.
+
+Safety Property:
+No two committed events SHALL share the same commit_seq.
+
+Liveness Property:
+If a majority of nodes are available, commit_seq progression SHALL continue.
+
 ------------------------------------------------------------------------
 
 ## 3. Formal Deterministic Invariants
@@ -72,6 +101,23 @@ Define deterministic transition function `delta: S x E -> S`.
 6.  Conformance test: for identical ordered event logs, independent
     replays SHALL yield bit-identical state hashes at every step.
 
+### Formal Contract: Deterministic State Hash
+
+State hash SHALL be computed as:
+
+SHA256(canonical_state_bytes)
+
+Where canonical_state_bytes:
+- UTF-8 encoded
+- Recursively sorted keys
+- Deterministic ordering of collections
+- No runtime-dependent formatting
+
+State hash algorithm SHALL be versioned and immutable per release.
+
+Conformance Test:
+Independent replays SHALL produce identical state_hash at every commit_seq.
+
 ------------------------------------------------------------------------
 
 ## 4. Conflict & Graph Model
@@ -79,6 +125,26 @@ Define deterministic transition function `delta: S x E -> S`.
 -   Conflict when affected subgraphs intersect
 -   No global locks
 -   Deterministic requeue strategy
+
+### Formal Contract: Conflict Graph Determinism
+
+Let G = (V, E) be the deterministic state graph reconstructed from Event Log.
+
+For an event e:
+- Define Target(e) as the deterministic set of nodes directly modified by e.
+- Define Closure(e) = Target(e) ∪ Ancestors(Target(e)).
+
+Conflict(e1, e2) ⇔ Closure(e1) ∩ Closure(e2) ≠ ∅
+
+Determinism Rules:
+1. Graph reconstruction from identical ordered event logs SHALL produce identical G.
+2. Closure computation SHALL be pure and independent of traversal order.
+3. On conflict detection, requeue priority SHALL be computed deterministically using:
+   (commit_seq ASC, event_id ASC).
+4. Conflict resolution SHALL NOT depend on wall-clock time or thread interleaving.
+
+Conformance Test:
+Replaying identical event logs SHALL produce identical conflict detection sets and requeue order.
 
 ------------------------------------------------------------------------
 
@@ -121,6 +187,21 @@ IDLE → VALIDATION → VERSION_ASSIGN → LOCK_ATTEMPT → PROCESSING → COMMI
 -   Replay reconstructs autonomy timeline
 -   Human override ladder required
 -   Decision traceability mandatory
+
+### Formal Contract: Governance Precedence
+
+Precedence Order (highest to lowest):
+
+1. Explicit Human Override Event
+2. Safety Constraint Violation
+3. Rule Engine Decision
+4. Scheduler Dispatch
+5. Autonomous Action Proposal
+
+If multiple controls apply at same commit boundary,
+resolution SHALL follow this strict order.
+
+No implicit precedence is allowed.
 
 ------------------------------------------------------------------------
 
@@ -203,6 +284,44 @@ IDLE → VALIDATION → VERSION_ASSIGN → LOCK_ATTEMPT → PROCESSING → COMMI
     unauthorized, tampered, and replayed requests with a stable error
     taxonomy.
 
+### Formal Contract: Deterministic Authorization Evaluation
+
+1. Authorization SHALL be evaluated using:
+   Policy(actor_type, authz_scope, event_type).
+2. Policy evaluation SHALL be pure and deterministic.
+3. Authorization failures SHALL be fail-closed.
+4. No event SHALL be appended before successful authorization evaluation.
+5. Conformance Test:
+   Identical inputs SHALL produce identical authorization decisions.
+
+### Formal Contract: Deterministic Replay Freshness
+
+1. Each inbound request SHALL include:
+   - request_id
+   - monotonic_actor_nonce
+2. For each actor_id:
+   - nonce MUST be strictly increasing.
+3. Duplicate request_id SHALL be rejected deterministically.
+4. Stale nonce SHALL be rejected deterministically.
+5. Freshness SHALL NOT depend on wall-clock time.
+6. Conformance Test:
+   Replay of identical inbound requests SHALL produce identical rejection outcomes.
+
+### Formal Contract: Key Lifecycle & Revocation
+
+1. All signature_key_id values SHALL map to a versioned key registry.
+2. Keys SHALL have explicit states:
+   - ACTIVE
+   - ROTATED
+   - REVOKED
+   - EXPIRED
+3. Revoked keys SHALL invalidate all future signature validations.
+4. Replay behavior:
+   Events signed with a key that was ACTIVE at commit_seq SHALL remain valid.
+5. Key rotation SHALL NOT modify historical event validity.
+6. Conformance Test:
+   Deterministic validation of event signatures across key state transitions.
+
 ------------------------------------------------------------------------
 
 ## 13. Compliance Readiness
@@ -211,6 +330,22 @@ IDLE → VALIDATION → VERSION_ASSIGN → LOCK_ATTEMPT → PROCESSING → COMMI
 -   Audit retention policy required
 -   AI Act placeholder
 -   Formal compliance documentation required
+
+### Formal Compliance Control Matrix
+
+For each compliance domain (GDPR, AI Act, Security, Supply Chain):
+
+1. Control SHALL be explicitly defined.
+2. Each control SHALL map to:
+   - Spec section reference
+   - Conformance test reference
+   - Audit artifact location
+3. Audit retention SHALL define:
+   - Retention period
+   - Immutable storage requirement
+   - Access control policy
+
+Compliance coverage SHALL be considered incomplete until all domains include defined controls and evidence mapping.
 
 ------------------------------------------------------------------------
 
