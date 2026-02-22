@@ -1,2 +1,28 @@
-name: Build Documentation
-on: [push]
+name: Documentation & Schema Validation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Validate JSON Schema format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          jq empty schemas/event-schema.json
+
+      - name: Ensure full-spec exists
+        run: |
+          test -f spec/full-spec.md
+
+      - name: Print success message
+        run: echo "Documentation and schema validation passed."

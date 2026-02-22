@@ -1,1 +1,112 @@
-{"event_id": "string", "base_version": "int", "target_version": "int"}
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AI_SYSTEM Enterprise Event Schema",
+  "type": "object",
+
+  "required": [
+    "event_id",
+    "event_type",
+    "version",
+    "base_version",
+    "timestamp",
+    "schema_version",
+    "payload"
+  ],
+
+  "properties": {
+
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Globally unique immutable event identifier"
+    },
+
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "StructuralEvent",
+        "AttributeEvent",
+        "SystemEvent",
+        "AIProposalEvent",
+        "SchedulerConfigEvent",
+        "AutonomyLevelChangeEvent"
+      ],
+      "description": "Logical domain classification of the event"
+    },
+
+    "version": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Target system version after commit"
+    },
+
+    "base_version": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Expected version before commit (optimistic concurrency control)"
+    },
+
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Event creation time in ISO 8601 UTC"
+    },
+
+    "schema_version": {
+      "type": "string",
+      "description": "Schema contract version for backward compatibility"
+    },
+
+    "payload": {
+      "type": "object",
+      "description": "Event-specific deterministic payload",
+      "additionalProperties": true
+    },
+
+    "metadata": {
+      "type": "object",
+      "description": "Optional trace and governance metadata",
+      "properties": {
+
+        "correlation_id": {
+          "type": "string"
+        },
+
+        "causation_id": {
+          "type": "string"
+        },
+
+        "actor": {
+          "type": "string",
+          "description": "Human or system initiator"
+        },
+
+        "autonomy_level": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5
+        },
+
+        "risk_score": {
+          "type": "number",
+          "minimum": 0
+        },
+
+        "regret_score": {
+          "type": "number",
+          "minimum": 0
+        },
+
+        "integrity_hash": {
+          "type": "string",
+          "description": "SHA256 hash of canonical serialized event"
+        }
+
+      },
+      "additionalProperties": true
+    }
+
+  },
+
+  "additionalProperties": false
+}
