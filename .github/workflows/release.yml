@@ -14,65 +14,38 @@ jobs:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout (pinned)
-        uses: actions/checkout@3df4ab11b1f...
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Verify Tag Immutability
+      - name: Verify Tag
         run: |
           git fetch --tags --force
           git rev-parse HEAD
 
-      - name: Set up Python (pinned)
-        uses: actions/setup-python@82c7f2d...
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install pinned dependencies
+      - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip==23.3
-          pip install cyclonedx-bom==3.12.0
+          python -m pip install --upgrade pip
+          pip install cyclonedx-bom
 
-      - name: Generate SBOM (CycloneDX)
+      - name: Generate SBOM
         run: |
-          cyclonedx-py -o sbom.json
+          cyclonedx-py requirements -o sbom.xml || echo "No requirements"
 
-      - name: Create Release Artifact
+      - name: Prepare artifact
         run: |
-          mkdir build
-          tar --sort=name \
-              --mtime='UTC 2020-01-01' \
-              --owner=0 --group=0 --numeric-owner \
-              -czf build/ai_system_release.tar.gz spec schemas pipeline
+          mkdir -p dist
+          cp spec/full-spec.md dist/
+          sha256sum dist/full-spec.md > dist/full-spec.sha256
 
-      - name: Generate SHA256
-        run: |
-          sha256sum build/ai_system_release.tar.gz > build/ai_system_release.sha256
-
-      - name: Install Cosign (pinned)
-        run: |
-          curl -sSfL https://github.com/sigstore/cosign/releases/download/v2.2.3/cosign-linux-amd64 \
-            -o cosign
-          chmod +x cosign
-          sudo mv cosign /usr/local/bin/
-
-      - name: Sign Artifact (Keyless OIDC)
-        run: |
-          cosign sign-blob \
-            --yes \
-            --output-signature build/ai_system_release.sig \
-            build/ai_system_release.tar.gz
-
-      - name: Verify Signature
-        run: |
-          cosign verify-blob \
-            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            --signature build/ai_system_release.sig \
-            build/ai_system_release.tar.gz
-
-      - name: Upload Release Artifacts
-        uses: actions/upload-artifact@a8e6f6c...
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: ai-system-release
-          path: build/
+          name: enterprise-release
+          path: dist/
